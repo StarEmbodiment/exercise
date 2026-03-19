@@ -3,8 +3,66 @@ import collections
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
+import torch.nn as nn
+import torch.nn.functional as F
 
 import rnn
+
+# ==================== 模型定义开始 ====================
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        weight_shape = list(m.weight.data.size())
+        fan_in = weight_shape[1]
+        fan_out = weight_shape[0]
+        w_bound = np.sqrt(6. / (fan_in + fan_out))
+        m.weight.data.uniform_(-w_bound, w_bound)
+        m.bias.data.fill_(0)
+        print("inital  linear weight ")
+
+class Word_embedding(nn.Module):
+    def __init__(self, vocab_length, embedding_dim):
+        super(Word_embedding, self).__init__()
+        w_embeding_random_intial = np.random.uniform(-1, 1, size=(vocab_length, embedding_dim))
+        self.Word_embedding = nn.Embedding(vocab_length, embedding_dim)
+        self.Word_embedding.weight.data.copy_(torch.from_numpy(w_embeding_random_intial))
+
+    def forward(self, input_sentence):
+        sen_embed = self.Word_embedding(input_sentence)
+        return sen_embed
+
+class RNN_model(nn.Module):
+    def __init__(self, batch_sz, vocab_len, word_embedding, embedding_dim, lstm_hidden_dim):
+        super(RNN_model, self).__init__()
+        self.word_embedding_lookup = word_embedding
+        self.batch_size = batch_sz
+        self.vocab_length = vocab_len
+        self.word_embedding_dim = embedding_dim
+        self.lstm_dim = lstm_hidden_dim
+        # 定义双层 LSTM，batch_first=True 使输入形状为 (batch, seq, feature)
+        self.rnn_lstm = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=lstm_hidden_dim,
+            num_layers=2,
+            batch_first=True
+        )
+        self.fc = nn.Linear(lstm_hidden_dim, vocab_len)
+        self.apply(weights_init)
+        self.softmax = nn.LogSoftmax(dim=-1)
+
+    def forward(self, sentence, is_test=False):
+        batch_input = self.word_embedding_lookup(sentence).view(1, -1, self.word_embedding_dim)
+        output, (h_n, c_n) = self.rnn_lstm(batch_input)          # output: (1, seq_len, lstm_dim)
+        out = output.contiguous().view(-1, self.lstm_dim)        # (seq_len, lstm_dim)
+        out = F.relu(self.fc(out))                                # (seq_len, vocab_len)
+        out = self.softmax(out)                                   # (seq_len, vocab_len)
+        if is_test:
+            prediction = out[-1, :].view(1, -1)                   # 取最后一个时间步
+            output = prediction
+        else:
+            output = out
+        return output
+# ==================== 模型定义结束 ====================
 
 start_token = 'G'
 end_token = 'E'
@@ -128,8 +186,8 @@ def run_training():
     BATCH_SIZE = 100
 
     torch.manual_seed(5)
-    word_embedding = rnn_lstm.word_embedding( vocab_length= len(word_to_int) + 1 , embedding_dim= 100)
-    rnn_model = rnn_lstm.RNN_model(batch_sz = BATCH_SIZE,vocab_len = len(word_to_int) + 1 ,word_embedding = word_embedding ,embedding_dim= 100, lstm_hidden_dim=128)
+    word_embedding = Word_embedding(vocab_length= len(word_to_int) + 1 , embedding_dim= 100)
+    rnn_model = RNN_model(batch_sz = BATCH_SIZE,vocab_len = len(word_to_int) + 1 ,word_embedding = word_embedding ,embedding_dim= 100, lstm_hidden_dim=128)
 
     # optimizer = optim.Adam(rnn_model.parameters(), lr= 0.001)
     optimizer=optim.RMSprop(rnn_model.parameters(), lr=0.01)
@@ -187,15 +245,15 @@ def pretty_print_poem(poem):  # 令打印的结果更工整
         shige.append(w)
     poem_sentences = poem.split('。')
     for s in poem_sentences:
-        if s != '' and len(s) > 10:
+        if s != '' and len(s) > 0 and s != 'E':
             print(s + '。')
 
 
 def gen_poem(begin_word):
     # poems_vector, word_int_map, vocabularies = process_poems2('./tangshi.txt')  #  use the other dataset to train the network
     poems_vector, word_int_map, vocabularies = process_poems1('./poems.txt')
-    word_embedding = rnn_lstm.word_embedding(vocab_length=len(word_int_map) + 1, embedding_dim=100)
-    rnn_model = rnn_lstm.RNN_model(batch_sz=64, vocab_len=len(word_int_map) + 1, word_embedding=word_embedding,
+    word_embedding = Word_embedding(vocab_length=len(word_int_map) + 1, embedding_dim=100)
+    rnn_model = RNN_model(batch_sz=64, vocab_len=len(word_int_map) + 1, word_embedding=word_embedding,
                                    embedding_dim=100, lstm_hidden_dim=128)
 
     rnn_model.load_state_dict(torch.load('./poem_generator_rnn'))
@@ -218,7 +276,7 @@ def gen_poem(begin_word):
 
 
 
-run_training()  # 如果不是训练阶段 ，请注销这一行 。 网络训练时间很长。
+#run_training()  # 如果不是训练阶段 ，请注销这一行 。 网络训练时间很长。
 
 
 pretty_print_poem(gen_poem("日"))
