@@ -18,7 +18,7 @@ def weights_init(m):
         w_bound = np.sqrt(6. / (fan_in + fan_out))
         m.weight.data.uniform_(-w_bound, w_bound)
         m.bias.data.fill_(0)
-        print("inital  linear weight ")
+        #print("inital  linear weight ")
 
 class Word_embedding(nn.Module):
     def __init__(self, vocab_length, embedding_dim):
@@ -92,7 +92,7 @@ def process_poems1(file_name):
                 content = start_token + content + end_token
                 poems.append(content)
             except ValueError as e:
-                print("error")
+                #print("error")
                 pass
     # 按诗的字数排序
     poems = sorted(poems, key=lambda line: len(line))
@@ -278,14 +278,21 @@ def gen_poem(begin_word):
 
 #run_training()  # 如果不是训练阶段 ，请注销这一行 。 网络训练时间很长。
 
-
+print("poem 1")
 pretty_print_poem(gen_poem("日"))
+print("poem 2")
 pretty_print_poem(gen_poem("红"))
+print("poem 3")
 pretty_print_poem(gen_poem("山"))
+print("poem 4")
 pretty_print_poem(gen_poem("夜"))
+print("poem 5")
 pretty_print_poem(gen_poem("湖"))
-pretty_print_poem(gen_poem("湖"))
-pretty_print_poem(gen_poem("湖"))
+print("poem 6")
+pretty_print_poem(gen_poem("海"))
+print("poem 7")
+pretty_print_poem(gen_poem("月"))
+print("poem 8")
 pretty_print_poem(gen_poem("君"))
 
 
